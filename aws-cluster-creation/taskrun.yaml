@@ -1,0 +1,137 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: my-eks-vol1
+spec:
+  resources:
+    requests:
+      storage: 1Gi
+  volumeMode: Filesystem
+  storageClassName: standard
+  accessModes:
+    - ReadWriteOnce
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-secret
+type: Opaque
+stringData:
+  username: user
+  aws_access_key_id: AKIAZSLS3RLM4Z5W6YPQ
+  aws_secret_access_key: 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
+data:
+  message: aGVsbG8gc2VjcmV0
+---
+apiVersion: tekton.dev/v1beta1
+kind: TaskRun
+metadata:
+  generateName: syn-clone-
+spec:
+  workspaces:
+    - name: custom
+      persistentVolumeClaim:
+        claimName: my-eks-vol1
+    - name: custom5
+      secret:
+        secretName: my-secret
+  taskSpec:
+    steps:
+    - name: clone
+      image: alpine/git #'gcr.io/tekton-releases/github.com/tektoncd/pipeline/cmd/git-init:v0.15.2'
+      env:
+      - name: CHECKOUT_DIR
+        value: "provision-aws-eks"
+      script: |
+        #!/usr/bin/env sh
+        set -eu
+        cat /etc/resolv.conf
+        cd $(workspaces.custom.path)
+        #CHECKOUT_DIR = "jx3-terraform-eks-infra"
+        if [ -d "${CHECKOUT_DIR}" ] ; then
+            # Delete non-hidden files and directories
+            rm -rf "${CHECKOUT_DIR:?}"/*
+            # Delete files and directories starting with . but excluding ..
+            rm -rf "${CHECKOUT_DIR}"/.[!.]*
+            # Delete files and directories starting with .. plus any other character
+            rm -rf "${CHECKOUT_DIR}"/..?*
+        fi
+        git clone https://github.com/synectiks-sddc/provision-aws-eks.git
+
+    - name: read
+      image: ubuntu
+      script: |
+        cd $(workspaces.custom.path)
+        cd provision-aws-eks
+        ls
+
+    - name: init
+      image: docker.io/hashicorp/terraform:light #0.13.6
+      workingDir: $(workspaces.custom.path)/provision-aws-eks
+      #args:
+      #- "init" -backend-config= "mybackend-tfstate " -backend-config= "key=red30/ecommerceapp/app.state " -backend-config="region=us-east-1 " "
+      script: |
+        #!/bin/sh
+        set -xe
+        export "AWS_ACCESS_KEY_ID=AKIAZSLS3RLMRFWB3DCJ" #`cat $(workspaces.custom5.path)/aws_access_key_id`"
+        export "AWS_SECRET_ACCESS_KEY=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" #`cat $(workspaces.custom5.path)/aws_secret_access_key`"
+        terraform init -backend-config="bucket=mybackend-tfstate" -backend-config="key=app3.state" -backend-config="region=us-east-1"
+
+    - name: terraform-plan
+      image: docker.io/hashicorp/terraform:light
+      workingDir: $(workspaces.custom.path)/provision-aws-eks
+      #args:
+      #- "plan"
+      script: |
+        #!/bin/sh
+        set -xe
+        #cat $(workspaces.secretspace.path)/username | grep "user"
+        #cat $(workspaces.secretspace.path)/aws_access_key_id
+        #cat $(workspaces.secretspace.path)/aws_secret_access_key
+        export "AWS_ACCESS_KEY_ID=AKIAZSLS3RLMRFWB3DCJ" #`cat $(workspaces.custom5.path)/aws_access_key_id`"
+        export "AWS_SECRET_ACCESS_KEY=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" #`cat $(workspaces.custom5.path)/aws_secret_access_key`"
+        export AWS_DEFAULT_REGION="us-east-1"
+        echo $AWS_ACCESS_KEY_ID
+        echo $AWS_SECRET_ACCESS_KEY
+
+        terraform plan -var cluster_name="myclustTT" -var cluster_version="1.21"
+
+    - name: terraform-apply
+      image: docker.io/hashicorp/terraform:light
+      workingDir: $(workspaces.custom.path)/provision-aws-eks
+      args:
+      - "plan"
+      script: |
+        #!/bin/sh
+        set -xe
+        #cat $(workspaces.secretspace.path)/username | grep "user"
+        #cat $(workspaces.secretspace.path)/aws_access_key_id
+        #cat $(workspaces.secretspace.path)/aws_secret_access_key
+        export "AWS_ACCESS_KEY_ID=AKIAZSLS3RLMRFWB3DCJ" #`cat $(workspaces.custom5.path)/aws_access_key_id`"
+        export "AWS_SECRET_ACCESS_KEY=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" #`cat $(workspaces.custom5.path)/aws_secret_access_key`"
+        export AWS_DEFAULT_REGION="us-east-1"
+        echo $AWS_ACCESS_KEY_ID
+        echo $AWS_SECRET_ACCESS_KEY
+        terraform apply --auto-approve -var cluster_name="myclustTT" -var cluster_version="1.21"
+
+    - name: terraform-destroy
+      image: docker.io/hashicorp/terraform:light
+      workingDir: $(workspaces.custom.path)/provision-aws-eks
+      script: |
+        #!/bin/sh
+        set -xe
+        #cat $(workspaces.secretspace.path)/username | grep "user"
+        #cat $(workspaces.secretspace.path)/aws_access_key_id
+        #cat $(workspaces.secretspace.path)/aws_secret_access_key
+        export "AWS_ACCESS_KEY_ID=AKIAZSLS3RLMRFWB3DCJ" #`cat $(workspaces.custom5.path)/aws_access_key_id`"
+        export "AWS_SECRET_ACCESS_KEY=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" #`cat $(workspaces.custom5.path)/aws_secret_access_key`"
+        export AWS_DEFAULT_REGION="us-east-1"
+        echo $AWS_ACCESS_KEY_ID
+        echo $AWS_SECRET_ACCESS_KEY
+        terraform destroy --auto-approve -var cluster_name="myclustTT" -var cluster_version="1.21"
+
+    workspaces:
+    - name: custom
+      mountPath: /data
+    - name: custom5
+      mountPath: /my/secret/volume

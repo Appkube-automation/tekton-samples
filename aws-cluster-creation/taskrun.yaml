@@ -18,8 +18,8 @@ metadata:
 type: Opaque
 stringData:
   username: user
-  aws_access_key_id: AKIAZSLS3RLM4Z5W6YPQ
-  aws_secret_access_key: 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
+  aws_access_key_id: define
+  aws_secret_access_key: define
 data:
   message: aGVsbG8gc2VjcmV0
 ---

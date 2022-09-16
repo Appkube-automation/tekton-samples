@@ -3,7 +3,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
-  name: sparse-checkout-list-dir
+  name: build-service
 spec:
   description: |
     sparse-checkout-list-dir takes a git repository and a list of
@@ -72,14 +72,14 @@ spec:
 apiVersion: tekton.dev/v1beta1
 kind: PipelineRun
 metadata:
-  name: git-clone-sparse-checkout
+  name: build-service-run
 spec:
   pipelineRef:
-    name: sparse-checkout-list-dir
+    name: build-service
   workspaces:
   - name: dockerconfig-secret
-    configmap:
-      name: my-config
+    secret:
+      secretName: kaniko-secret
   - name: shared-data
     volumeClaimTemplate:
       spec:

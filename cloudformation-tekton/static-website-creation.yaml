@@ -1,14 +1,21 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-   : my-web-vol1
+  name: my-pvc
 spec:
   resources:
     requests:
-      storage: 1Gi
+      storage: 5Gi
   volumeMode: Filesystem
   accessModes:
     - ReadWriteOnce
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-configmap
+data:
+  message: hello world
 ---
 apiVersion: v1
 kind: Secret
@@ -17,20 +24,20 @@ metadata:
 type: Opaque
 stringData:
   username: user
-  aws_access_key_id: "abcd"
-  aws_secret_access_key: "lkjh"
+  aws_access_key_id: "<AccessKeyID>"
+  aws_secret_access_key: "<SecretAccessKeyID>"
 data:
   message: aGVsbG8gc2VjcmV0
 ---
 apiVersion: tekton.dev/v1beta1
 kind: TaskRun
 metadata:
-  name: create-websecure
+  generateName: custom-volume-
 spec:
   workspaces:
-    - name: repo_volume
+    - name: repovol
       persistentVolumeClaim:
-        claimName: my-web-vol1
+        claimName: my-pvc
     - name: secret_ws
       secret:
         secretName: my-secret 
@@ -38,14 +45,20 @@ spec:
     steps:
     - name: clone
       image: alpine/git #'gcr.io/tekton-releases/github.com/tektoncd/pipeline/cmd/git-init:v0.15.2'
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - "ALL"
+        # User 65532 is the nonroot user ID
+        # runAsNonRoot: true
       env:
       - name: CHECKOUT_DIR
         value: "amazon-cloudfront-secure-static-site"
       script: |
         #!/usr/bin/env sh
         set -eu
-        cat /etc/resolv.conf
-        cd $(workspaces.repo_volume.path)
+        cd $(workspaces.repovol.path)
         if [ -d "${CHECKOUT_DIR}" ] ; then
             # Delete non-hidden files and directories
             rm -rf "${CHECKOUT_DIR:?}"/*
@@ -56,72 +69,47 @@ spec:
         fi
         git clone https://github.com/aws-samples/amazon-cloudfront-secure-static-site.git
 
-    - name: initiate-repo
-      image: docker.io/hashicorp/terraform:light #0.13.6
-      workingDir: $(workspaces.repo_volume.path)/provision-aws-eks
-      #args:
-      #- "init" -backend-config= "mybackend-tfstate " -backend-config= "key=red30/ecommerceapp/app.state " -backend-config="region=us-east-1 " "
+    - name: npm-make
+      image: node
+      workingDir: $(workspaces.repovol.path)/amazon-cloudfront-secure-static-site
       script: |
         #!/bin/sh
         set -xe
-        export AWS_ACCESS_KEY_ID=`cat $(workspaces.secret_ws.path)/aws_access_key_id`
-        export AWS_SECRET_ACCESS_KEY=`cat $(workspaces.secret_ws.path)/aws_secret_access_key`
-        terraform init -upgrade -backend-config="bucket=mybackend-tfstate" -backend-config="key=app4.state" -backend-config="region=us-east-1"
+        apt-get update
+        apt-get install -y zip
+        make package-static
 
-    #step Plan
-    - name: plan-cluster
-      image: docker.io/hashicorp/terraform:light
-      workingDir: $(workspaces.repo_volume.path)/provision-aws-eks
-      #args:
-      #- "plan"
+    - name: codetos3
+      image: amazon/aws-cli
+      workingDir: $(workspaces.repovol.path)/amazon-cloudfront-secure-static-site
       script: |
         #!/bin/sh
         set -xe
         export AWS_ACCESS_KEY_ID=`cat $(workspaces.secret_ws.path)/aws_access_key_id`
         export AWS_SECRET_ACCESS_KEY=`cat $(workspaces.secret_ws.path)/aws_secret_access_key`
-        echo $aws_access_key_id
-        echo $aws_secret_access_key
-        terraform plan -var cluster_name="myclustTT" -var cluster_version="1.21"
-    
-    - name: create-cluster
-      image: docker.io/hashicorp/terraform:light
-      workingDir: $(workspaces.repo_volume.path)/provision-aws-eks
-      args:
-      - "plan"
-      script: |
-        #!/bin/sh
-        set -xe
-        export AWS_ACCESS_KEY_ID=`cat $(workspaces.secret_ws.path)/aws_access_key_id`
-        export AWS_SECRET_ACCESS_KEY=`cat $(workspaces.secret_ws.path)/aws_secret_access_key`
-        export AWS_DEFAULT_REGION="us-east-1"
-        terraform apply --auto-approve -var cluster_name="myclustTT" -var cluster_version="1.21"
+        #aws s3 mb s3://trainingusbatch
 
-    - name: apply-managed-service
-      image: docker.io/hashicorp/terraform:light
-      workingDir: $(workspaces.repo_volume.path)/provision-aws-eks
-      args:
-      - "plan"
+    - name: cloudinit
+      image: amazon/aws-cli
+      workingDir: $(workspaces.repovol.path)/amazon-cloudfront-secure-static-site
       script: |
         #!/bin/sh
         set -xe
         export AWS_ACCESS_KEY_ID=`cat $(workspaces.secret_ws.path)/aws_access_key_id`
         export AWS_SECRET_ACCESS_KEY=`cat $(workspaces.secret_ws.path)/aws_secret_access_key`
-        export AWS_DEFAULT_REGION="us-east-1"
-
-    - name: update-cmdb
-      image: docker.io/hashicorp/terraform:light
-      workingDir: $(workspaces.repo_volume.path)/provision-aws-eks
-      args:
-      - "plan"
+        ls
+        aws --region us-east-1 cloudformation package --template-file templates/main.yaml --s3-bucket trainingusbatch --output-template-file packaged.template
+        
+    - name: clouddeploy
+      image: amazon/aws-cli
+      workingDir: $(workspaces.repovol.path)/amazon-cloudfront-secure-static-site
       script: |
         #!/bin/sh
         set -xe
         export AWS_ACCESS_KEY_ID=`cat $(workspaces.secret_ws.path)/aws_access_key_id`
         export AWS_SECRET_ACCESS_KEY=`cat $(workspaces.secret_ws.path)/aws_secret_access_key`
-        export AWS_DEFAULT_REGION="us-east-1"
-
+        ls
+        aws --region us-east-1 cloudformation deploy --stack-name securewebsitecf --template-file packaged.template --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND --parameter-overrides  DomainName=synectiks.net SubDomain=mysite HostedZoneId=ZY8RNBR15YWYU
     workspaces:
-    - name: repo_volume
-      mountPath: /data
+    - name: repovol
     - name: secret_ws
-      mountPath: /my/secret/volume

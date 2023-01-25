@@ -109,7 +109,7 @@ spec:
         export AWS_ACCESS_KEY_ID=`cat $(workspaces.secret_ws.path)/aws_access_key_id`
         export AWS_SECRET_ACCESS_KEY=`cat $(workspaces.secret_ws.path)/aws_secret_access_key`
         ls
-        aws --region us-east-1 cloudformation deploy --stack-name securewebsitecf --template-file packaged.template --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND --parameter-overrides  DomainName=synectiks.net SubDomain=mysite HostedZoneId=ZY8RNBR15YWYU
+        aws --region us-east-1 cloudformation deploy --stack-name securewebsitecf --template-file packaged.template --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND --parameter-overrides  DomainName=synectiks.net SubDomain=mysite HostedZoneId=<addHostedZoneID>
     workspaces:
     - name: repovol
     - name: secret_ws

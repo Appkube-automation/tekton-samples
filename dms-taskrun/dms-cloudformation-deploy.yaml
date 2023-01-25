@@ -1,0 +1,97 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dms-vol-1
+spec:
+  resources:
+    requests:
+      storage: 1Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dms-deploy-secret
+type: Opaque
+stringData:
+  username: user
+  aws_access_key_id: "<accessKeyID>"
+  aws_secret_access_key: "<secretaccesskey>"
+---
+apiVersion: tekton.dev/v1beta1
+kind: TaskRun
+metadata:
+  generateName: dms-deploy-
+spec:
+  workspaces:
+    - name: repo_volume
+      persistentVolumeClaim:
+        claimName: dms-vol-1
+    - name: secret_ws
+      secret:
+        secretName: dms-deploy-secret 
+  taskSpec:
+    steps:
+    - name: clone
+      image: alpine/git #'gcr.io/tekton-releases/github.com/tektoncd/pipeline/cmd/git-init:v0.15.2'
+      env:
+      - name: CHECKOUT_DIR
+        value: "tekton-dms"
+      script: |
+        #!/usr/bin/env sh
+        set -eu
+        cat /etc/resolv.conf
+        cd $(workspaces.repo_volume.path)
+        if [ -d "${CHECKOUT_DIR}" ] ; then
+            # Delete non-hidden files and directories
+            rm -rf "${CHECKOUT_DIR:?}"/*
+            # Delete files and directories starting with . but excluding ..
+            rm -rf "${CHECKOUT_DIR}"/.[!.]*
+            # Delete files and directories starting with .. plus any other character
+            rm -rf "${CHECKOUT_DIR}"/..?*
+        fi
+        git clone https://github.com/synectiks-sddc/tekton-dms.git
+
+    - name: initiate-repo
+      image: docker.io/hashicorp/terraform:light #0.13.6
+      workingDir: $(workspaces.repo_volume.path)/tekton-dms
+      script: |
+        #!/bin/sh
+        set -xe
+        ls
+        export AWS_ACCESS_KEY_ID=`cat $(workspaces.secret_ws.path)/aws_access_key_id`
+        export AWS_SECRET_ACCESS_KEY=`cat $(workspaces.secret_ws.path)/aws_secret_access_key`
+        terraform init -upgrade -backend-config="bucket=trainingusbatch" -backend-config="key=newdmsapp.tfstate" -backend-config="region=us-east-1"
+    
+    - name: plan-dms-deployment
+      image: docker.io/hashicorp/terraform:light
+      workingDir: $(workspaces.repo_volume.path)/tekton-dms
+      #args:
+      #- "plan"
+      script: |
+        #!/bin/sh
+        set -xe
+        export AWS_ACCESS_KEY_ID=`cat $(workspaces.secret_ws.path)/aws_access_key_id`
+        export AWS_SECRET_ACCESS_KEY=`cat $(workspaces.secret_ws.path)/aws_secret_access_key`
+        echo $aws_access_key_id
+        echo $aws_secret_access_key
+        terraform plan
+
+    - name: create-cluster
+      image: docker.io/hashicorp/terraform:light
+      workingDir: $(workspaces.repo_volume.path)/tekton-dms
+      script: |
+        #!/bin/sh
+        set -xe
+        export AWS_ACCESS_KEY_ID=`cat $(workspaces.secret_ws.path)/aws_access_key_id`
+        export AWS_SECRET_ACCESS_KEY=`cat $(workspaces.secret_ws.path)/aws_secret_access_key`
+        export AWS_DEFAULT_REGION="us-east-1"
+        terraform apply --auto-approve
+
+    workspaces:
+    - name: repo_volume
+      mountPath: /data
+    - name: secret_ws
+      mountPath: /my/secret/volume

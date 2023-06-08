@@ -26,6 +26,8 @@ If locally that is running - then u can create the secret in k8s as follows:
 
 kubectl create secret generic kaniko-secret --from-file=<path to kaniko-secret.json>
 
+WHile reating secret , sometime u need to create in same namespace tekton-pipelines so the pipelines can read
+
 The pipelinerun access this secret from the workspace as follows:
  workspaces:
   - name: dockerconfig-secret

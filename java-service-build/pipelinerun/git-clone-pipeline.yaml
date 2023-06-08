@@ -3,7 +3,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
-  name: build-service
+  name: git-clone-pipeline
 spec:
   description: |
     sparse-checkout-list-dir takes a git repository and a list of
@@ -21,17 +21,11 @@ spec:
   - name: repo-url
     type: string
     description: The git repository URL to clone from.
-  - name: dockerImageUrl
-    type: string
-    description: Docker Image URL to push the image
   workspaces:
   - name: shared-data
     description: |
       This workspace will receive the cloned git repo and be passed
       to the next Task to list all cloned files and directories.
-  - name: dockerconfig-secret
-    description: |
-      This workspace will have docker config.json
   tasks:
   - name: fetch-repo
     taskRef:
@@ -42,44 +36,15 @@ spec:
     params:
     - name: url
       value: $(params.repo-url)
-  - name: build-maven
-    runAfter: ["fetch-repo"]
-    taskRef:
-      name: build-maven
-    workspaces:
-    - name: source
-      workspace: shared-data
-    params:
-    - name: workingDir
-      value: $(workspaces.source.path)
-  - name: build-kaniko
-    runAfter: ["build-maven"]
-    taskRef:
-      name: build-kaniko
-    workspaces:
-    - name: source
-      workspace: shared-data
-    - name: dockerconfig
-      workspace: dockerconfig-secret
-    params:
-    - name: IMAGE
-      value: $(params.dockerImageUrl)
-    - name: DOCKERFILE
-      value: $(workspaces.source.path)/Dockerfile
-    - name: CONTEXT
-      value: ./
 ---
 apiVersion: tekton.dev/v1beta1
 kind: PipelineRun
 metadata:
-  name: build-service-run
+  name: git-clone-pipeline-run
 spec:
   pipelineRef:
-    name: build-service
+    name: git-clone-pipeline
   workspaces:
-  - name: dockerconfig-secret
-    secret:
-      secretName: kaniko-secret
   - name: shared-data
     volumeClaimTemplate:
       spec:
@@ -91,5 +56,3 @@ spec:
   params:
   - name: repo-url
     value: https://github.com/dcanadillas/petclinic-kaniko.git
-  - name: dockerImageUrl
-    value: synectiks/docker-builders:kaniko

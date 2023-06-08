@@ -2,6 +2,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: tekton-access
+  namespace: tekton-pipelines
 spec:
   defaultBackend:
     service:
@@ -9,6 +10,7 @@ spec:
       port:
         number: 9097
   rules:
+  - host: tekton.synectiks.net  
   - http:
       paths:
       - path: /

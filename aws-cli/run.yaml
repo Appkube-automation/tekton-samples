@@ -1,0 +1,26 @@
+apiVersion: tekton.dev/v1beta1
+kind: TaskRun
+metadata:
+  generateName: aws-run-
+spec:
+  taskRef:
+    name: aws-cli
+  params:
+    - name: SCRIPT
+      value: |
+        export AWS_CONFIG_FILE=/tekton/home/.aws/config
+        export AWS_SHARED_CREDENTIALS_FILE=/tekton/home/.aws/credentials
+        echo "displaying creds"
+        cat $1
+        echo "\n"
+        echo "displaying config"
+        cat $2
+        aws s3 ls
+    - name: ARGS
+      value:
+        - /tekton/home/.aws/credentials
+        - /tekton/home/.aws/config
+  workspaces:
+    - name: secrets
+      secret:
+        secretName: aws-credentials

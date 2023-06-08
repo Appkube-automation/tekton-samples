@@ -1,0 +1,97 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dms-deploy-vol
+spec:
+  resources:
+    requests:
+      storage: 1Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dms-deploy-secret
+type: Opaque
+stringData:
+  username: user
+  aws_access_key_id: "<accessKeyID>"
+  aws_secret_access_key: "<SecretAccessKeyID>"
+---
+apiVersion: tekton.dev/v1beta1
+kind: TaskRun
+metadata:
+  generateName: dms-deploy-
+spec:
+  workspaces:
+    - name: repo_volume
+      persistentVolumeClaim:
+        claimName: dms-deploy-vol
+    - name: secret_ws
+      secret:
+        secretName: dms-deploy-secret 
+  taskSpec:
+    steps:
+    - name: clone
+      image: alpine/git #'gcr.io/tekton-releases/github.com/tektoncd/pipeline/cmd/git-init:v0.15.2'
+      env:
+      - name: CHECKOUT_DIR
+        value: "learn-terraform-aft-account-request"
+      - name: DMS_RELEASE
+        value: "formkiq-core-1.6.1.zip"
+      script: |
+        #!/usr/bin/env sh
+        set -eu
+        cd $(workspaces.repo_volume.path)
+        # if [ -d "${CHECKOUT_DIR}" ] ; then
+        #     # Delete non-hidden files and directories
+        #     rm -rf "${CHECKOUT_DIR:?}"/*
+        #     # Delete files and directories starting with . but excluding ..
+        #     rm -rf "${CHECKOUT_DIR}"/.[!.]*
+        #     # Delete files and directories starting with .. plus any other character
+        #     rm -rf "${CHECKOUT_DIR}"/..?*
+        # fi
+        if [ -f  "$DMS_RELEASE" ] ; then
+            rm "$DMS_RELEASE"
+            rm -rf *
+        fi
+        wget https://github.com/formkiq/formkiq-core/releases/download/v1.6.1/$DMS_RELEASE
+        ls
+
+    - name: extract-package
+      image: dockerqa/unzip
+      workingDir: $(workspaces.repo_volume.path) 
+      script: |
+        #!/bin/sh
+        set -xe
+        ls
+        unzip formkiq-core-1.6.1.zip
+
+    - name: add-config
+      image: amazon/aws-cli
+      workingDir: $(workspaces.repo_volume.path)
+      script: |
+        #!/bin/sh
+        set -xe
+        export AWS_ACCESS_KEY_ID=`cat $(workspaces.secret_ws.path)/aws_access_key_id`
+        export AWS_SECRET_ACCESS_KEY=`cat $(workspaces.secret_ws.path)/aws_secret_access_key`
+        aws s3 cp s3://acc-request/dms-sam-configs/samconfig.toml .
+        # ls
+   
+    - name: run-deploy
+      image: amazon/aws-sam-cli-build-image-provided
+      workingDir: $(workspaces.repo_volume.path)
+      script: |
+        #!/bin/sh
+        set -xe
+        export AWS_ACCESS_KEY_ID=`cat $(workspaces.secret_ws.path)/aws_access_key_id`
+        export AWS_SECRET_ACCESS_KEY=`cat $(workspaces.secret_ws.path)/aws_secret_access_key`
+        sam deploy --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND CAPABILITY_NAMED_IAM --no-confirm-changeset
+
+    workspaces:
+    - name: repo_volume
+      mountPath: /data
+    - name: secret_ws
+      mountPath: /my/secret/volume

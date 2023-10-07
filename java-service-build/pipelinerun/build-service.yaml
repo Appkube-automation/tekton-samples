@@ -90,6 +90,6 @@ spec:
             storage: 1Gi
   params:
   - name: repo-url
-    value: https://github.com/dcanadillas/petclinic-kaniko.git
+    value: https://github.com/AppkubeCloud/appkube-cmdb-service.git
   - name: dockerImageUrl
     value: synectiks/docker-builders:kaniko

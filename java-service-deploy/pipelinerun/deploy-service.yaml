@@ -1,0 +1,69 @@
+
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: deploy-service
+spec:
+  description: |
+    This is an example pipeline demonstrating the following:
+      - Using the git-clone catalog Task to clone a specific set of
+        files based on directory patterns.
+      - Passing a cloned repo to subsequent Tasks using a Workspace.
+      - Ordering Tasks in a Pipeline using "runAfter" so that
+        git-clone completes before we try to read from the Workspace.
+      - Using a volumeClaimTemplate Volume as a Workspace.
+      - Avoiding hard-coded paths by using a Workspace's path
+        variable instead.
+  params:
+  - name: repo-url
+    type: string
+    description: The git repository URL to clone from.
+  workspaces:
+  - name: shared-data
+    description: |
+      This workspace will receive the cloned git repo and be passed
+      to the next Task to list all cloned files and directories.
+  tasks:
+  - name: fetch-repo
+    taskRef:
+      name: git-clone
+    workspaces:
+    - name: output
+      workspace: shared-data
+    params:
+    - name: url
+      value: $(params.repo-url)
+  - name: helm-install
+    runAfter: ["fetch-repo"]
+    taskRef:
+      name: helm-install
+    workspaces:
+    - name: source
+      workspace: shared-data
+    params:
+    - name: workingDir
+      value: $(workspaces.source.path)
+---
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: deploy-service-run
+spec:
+  pipelineRef:
+    name: deploy-service
+  workspaces:
+  - name: dockerconfig-secret
+    secret:
+      secretName: kaniko-secret
+  - name: shared-data
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  params:
+  - name: repo-url
+    value: https://github.com/synectiks-sddc/tekton-samples.git

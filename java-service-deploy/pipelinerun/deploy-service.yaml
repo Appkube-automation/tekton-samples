@@ -19,9 +19,6 @@ spec:
   - name: repo-url
     type: string
     description: The git repository URL to clone from.
-  - name: branch-name
-    type: string
-    description: The git branch to clone
   workspaces:
   - name: shared-data
     description: |
@@ -37,9 +34,6 @@ spec:
     params:
     - name: url
       value: $(params.repo-url)
-    params:
-    - name: url
-      value: $(params.branch-name)
   - name: helm-install
     runAfter: ["fetch-repo"]
     taskRef:
@@ -73,5 +67,3 @@ spec:
   params:
   - name: repo-url
     value: https://github.com/synectiks-sddc/tekton-samples.git
-  - name: branch-name
-    value: deploy-cmdb-pipeline

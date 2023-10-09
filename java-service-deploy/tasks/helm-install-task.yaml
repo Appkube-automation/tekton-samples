@@ -20,7 +20,7 @@ spec:
       args:
         - "install"
         - "-f"
-        - "appkube-cmdb-service"
+        - {{ include "appkube-cmdb-service.fullname" . }}
         - "-n"
-        - "appkube-cmdb-service"
+        - {{ include "appkube-cmdb-service.fullname" . }}
         - "--generate-name"

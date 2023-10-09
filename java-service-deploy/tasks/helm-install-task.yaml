@@ -1,0 +1,26 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: helm-install
+spec:
+  workspaces:
+    - name: source
+      description: The git repo will be cloned onto the volume backing this Workspace.
+  params:
+    - name: workingDir
+      description: Working directory parameter
+      default: ""
+  steps:
+    - name: read-directory
+      image: ubuntu
+      script: echo $(params.workingDir) && ls -al $(params.workingDir) && ls -al
+    - name: maven-build
+      workingDir: $(params.workingDir)
+      command: ["helm"]
+      args:
+        - "install"
+        - "-f"
+        - {{ include "appkube-cmdb-service.fullname" . }}
+        - "-n"
+        - {{ include "appkube-cmdb-service.fullname" . }}
+        - "--generate-name"

@@ -3,7 +3,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
-  name: build-service
+  name: appkube-cmdb-service-smoke
 spec:
   description: |
     sparse-checkout-list-dir takes a git repository and a list of
@@ -21,9 +21,27 @@ spec:
   - name: repo-url
     type: string
     description: The git repository URL to clone from.
+  - name: helm-repo-url
+    type: string
+    description: The git repository URL to clone from.
   - name: dockerImageUrl
     type: string
     description: Docker Image URL to push the image
+  - name: aws-script-param
+    type: string
+    description: AWS script to run
+  - name: helm-script-param
+    type: string
+    description: Script to configure kubectl and run helm
+  - name: helm-release-version-param
+    type: string
+    description: Release version in helm chart
+  - name: helm-release-name-param
+    type: string
+    description: Helm release name
+  - name: helm-release-namespace-param
+    type: string
+    description: namespace for service installation
   workspaces:
   - name: shared-data
     description: |
@@ -32,6 +50,9 @@ spec:
   - name: dockerconfig-secret
     description: |
       This workspace will have docker config.json
+  - name: aws-secrets
+    description: |
+      This workspace will hold aws credentials
   tasks:
   - name: fetch-repo
     taskRef:
@@ -68,18 +89,60 @@ spec:
       value: $(workspaces.source.path)/Dockerfile
     - name: CONTEXT
       value: ./
+  - name: fetch-helm-repo
+    runAfter: ["build-kaniko"]
+    taskRef:
+      name: git-clone
+    workspaces:
+    - name: output
+      workspace: shared-data
+    params:
+    - name: url
+      value: $(params.helm-repo-url)
+  - name: aws-config
+    runAfter: ["build-kaniko", "fetch-helm-repo"]
+    taskRef:
+      name: aws-cli
+    params:
+    - name: SCRIPT
+      value: $(params.aws-script-param)
+    - name: ARGS
+      value:
+        - /tekton/home/.aws/credentials
+        - /tekton/home/.aws/config
+    - name: workingDir
+      value: $(workspaces.source.path)
+    workspaces:
+    - name: secrets
+      workspace: aws-secrets
+    - name: source
+      workspace: shared-data
+  - name: service-deploy-with-helm
+    runAfter: ["aws-config"]
+    taskRef:
+      name: helm-appkube-cmdb-install
+    params:
+    - name: script 
+      value: $(params.helm-script-param)
+    - name: release_version
+      value: $(params.helm-release-version-param)
+    - name: release_name
+      value: $(params.helm-release-name-param)
+    - name: release_namespace
+      value: $(params.helm-release-namespace-param)
+    workspaces:
+    - name: source
+      workspace: shared-data
+
 ---
 apiVersion: tekton.dev/v1beta1
 kind: PipelineRun
 metadata:
-  name: build-service-run
+  name: appkube-cmdb-service-smoke-run
 spec:
   pipelineRef:
-    name: build-service
+    name: appkube-cmdb-service-smoke
   workspaces:
-  - name: dockerconfig-secret
-    secret:
-      secretName: kaniko-secret
   - name: shared-data
     volumeClaimTemplate:
       spec:
@@ -88,8 +151,52 @@ spec:
         resources:
           requests:
             storage: 1Gi
+  - name: dockerconfig-secret
+    secret:
+      secretName: kaniko-secret
+  - name: aws-secrets
+    secret:
+      secretName: smoke-aws-credentials
   params:
   - name: repo-url
     value: https://github.com/AppkubeCloud/appkube-cmdb-service.git
+  - name: helm-repo-url
+    value: https://github.com/synectiks-sddc/tekton-samples.git
   - name: dockerImageUrl
     value: synectiks/docker-builders:kaniko
+  - name: aws-script-param
+    value: |
+      export AWS_CONFIG_FILE=/tekton/home/.aws/config
+      export AWS_SHARED_CREDENTIALS_FILE=/tekton/home/.aws/credentials
+      echo "displaying creds"
+      cat $1
+      echo "\n"
+      echo "displaying config"
+      cat $2
+      aws s3 ls
+      echo "create kubectl configuration file"
+      aws eks update-kubeconfig --region us-east-1 --name myclustTT
+  - name: helm-release-version-param
+    value: 0.1.0
+  - name: helm-release-name-param
+    value: appkube-cmdb-service
+  - name: helm-release-namespace-param
+    value: tekton-pipelines
+  - name: helm-script-param
+    value: |
+      echo "Configure kubectl for eks cluster"
+      aws eks update-kubeconfig --region us-east-1 --name myclustTT
+
+      echo "Export KUBECONFIG file"
+      [[ -f /root/.kube/config ]]; export KUBECONFIG=/root/.kube/config && \
+      echo "export success"
+
+      echo "List repo, ls -al /workspace/source"
+      ls -al /workspace/source
+
+      echo "Check kubectl presence"
+      kubectl version
+      echo "Test kubectl and eks connection, kubectl get pods"
+      kubectl get pods
+      echo installing helm chart...
+      helm install -n "$(params.release_namespace)" $(params.release_name) /workspace/source/java-service-deploy/$(params.release_name)

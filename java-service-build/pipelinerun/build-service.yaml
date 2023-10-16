@@ -27,9 +27,6 @@ spec:
   - name: dockerImageUrl
     type: string
     description: Docker Image URL to push the image
-  - name: aws-script-param
-    type: string
-    description: AWS script to run
   - name: helm-script-param
     type: string
     description: Script to configure kubectl and run helm
@@ -47,6 +44,9 @@ spec:
     description: |
       This workspace will receive the cloned git repo and be passed
       to the next Task to list all cloned files and directories.
+  - name: shared-data1
+    description: |
+      This workspace will receive the cloned helm git repo
   - name: dockerconfig-secret
     description: |
       This workspace will have docker config.json
@@ -90,35 +90,16 @@ spec:
     - name: CONTEXT
       value: ./
   - name: fetch-helm-repo
-    runAfter: ["build-kaniko"]
     taskRef:
       name: git-clone
     workspaces:
     - name: output
-      workspace: shared-data
+      workspace: shared-data1
     params:
     - name: url
       value: $(params.helm-repo-url)
-  - name: aws-config
-    runAfter: ["build-kaniko", "fetch-helm-repo"]
-    taskRef:
-      name: aws-cli
-    params:
-    - name: SCRIPT
-      value: $(params.aws-script-param)
-    - name: ARGS
-      value:
-        - /tekton/home/.aws/credentials
-        - /tekton/home/.aws/config
-    - name: workingDir
-      value: $(workspaces.source.path)
-    workspaces:
-    - name: secrets
-      workspace: aws-secrets
-    - name: source
-      workspace: shared-data
   - name: service-deploy-with-helm
-    runAfter: ["aws-config"]
+    runAfter: ["build-kaniko"]
     taskRef:
       name: helm-appkube-cmdb-install
     params:
@@ -132,7 +113,9 @@ spec:
       value: $(params.helm-release-namespace-param)
     workspaces:
     - name: source
-      workspace: shared-data
+      workspace: shared-data1
+    - name: secrets
+      workspace: aws-secrets
 
 ---
 apiVersion: tekton.dev/v1beta1
@@ -144,6 +127,14 @@ spec:
     name: appkube-cmdb-service-smoke
   workspaces:
   - name: shared-data
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  - name: shared-data1
     volumeClaimTemplate:
       spec:
         accessModes:
@@ -164,26 +155,16 @@ spec:
     value: https://github.com/synectiks-sddc/tekton-samples.git
   - name: dockerImageUrl
     value: synectiks/docker-builders:kaniko
-  - name: aws-script-param
-    value: |
-      export AWS_CONFIG_FILE=/tekton/home/.aws/config
-      export AWS_SHARED_CREDENTIALS_FILE=/tekton/home/.aws/credentials
-      echo "displaying creds"
-      cat $1
-      echo "\n"
-      echo "displaying config"
-      cat $2
-      aws s3 ls
-      echo "create kubectl configuration file"
-      aws eks update-kubeconfig --region us-east-1 --name myclustTT
   - name: helm-release-version-param
     value: 0.1.0
   - name: helm-release-name-param
     value: appkube-cmdb-service
   - name: helm-release-namespace-param
-    value: tekton-pipelines
+    value: appkube-cmdb-service
   - name: helm-script-param
     value: |
+      export AWS_CONFIG_FILE=/tekton/home/.aws/config
+      export AWS_SHARED_CREDENTIALS_FILE=/tekton/home/.aws/credentials
       echo "Configure kubectl for eks cluster"
       aws eks update-kubeconfig --region us-east-1 --name myclustTT
 
@@ -199,4 +180,5 @@ spec:
       echo "Test kubectl and eks connection, kubectl get pods"
       kubectl get pods
       echo installing helm chart...
+      echo helm install -n "$(params.release_namespace)" $(params.release_name) /workspace/source/java-service-deploy/$(params.release_name)
       helm install -n "$(params.release_namespace)" $(params.release_name) /workspace/source/java-service-deploy/$(params.release_name)

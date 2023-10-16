@@ -18,6 +18,9 @@ spec:
   workspaces:
     - name: source
       optional: true
+    - name: secrets
+      optional: true
+      mountPath: /tekton/home/.aws
   params:
     - name: workingDir
       description: Working directory parameter
@@ -50,14 +53,11 @@ spec:
     - name: upgrade-from-repo
       image: $(params.helm_image)
       script: |
-        
+        export AWS_CONFIG_FILE=/tekton/home/.aws/config
+        export AWS_SHARED_CREDENTIALS_FILE=/tekton/home/.aws/credentials
         echo "Configure kubectl for eks cluster"
         aws eks update-kubeconfig --region us-east-1 --name myclustTT
-
-        echo "Export KUBECONFIG file"
-        [[ -f /root/.kube/config ]]; export KUBECONFIG=/root/.kube/config && \
-        echo "export success"
-
+        
         echo "List repo, ls -al /workspace/source"
         ls -al /workspace/source
 
@@ -76,4 +76,4 @@ spec:
         #helm repo update
         echo installing helm chart...
         #helm upgrade --wait --install --namespace "$(params.release_namespace)" $(params.release_name) $(params.chart_name) --debug --set "$(params.overwrite_values)"
-        helm install /workspace/source/java-service-deploy/appkube-cmdb-service -n appkube-cmdb-service --generate-name
+        helm install -n appkube-cmdb-service appkube-cmdb-service /workspace/source/java-service-deploy/appkube-cmdb-service

@@ -1,0 +1,19 @@
+apiVersion: tekton.dev/v1beta1
+kind: TaskRun
+metadata:
+  generateName: git-clone-run-
+spec:
+  taskRef:
+    name: git-clone
+  params:
+    - name: url
+      value: https://github.com/AppkubeCloud/appkube-cmdb-service.git
+  workspaces:
+    - name: output
+      volumeClaimTemplate:
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi

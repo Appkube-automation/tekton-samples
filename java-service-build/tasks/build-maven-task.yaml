@@ -13,8 +13,8 @@ spec:
   steps:
     - name: read-directory
       image: ubuntu
-      script: echo $(params.workingDir) && ls -al $(params.workingDir) && ls -al
-    - name: maven-build
+      script: echo $(params.workingDir) && ls -al $(params.workingDir)
+    - name: maven-builid
       image: gcr.io/cloud-builders/mvn:3.5.0-jdk-8
       workingDir: $(params.workingDir)
       command: ["mvn"]

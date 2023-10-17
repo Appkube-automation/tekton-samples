@@ -1,0 +1,59 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: aws-cli
+  labels:
+    app.kubernetes.io/version: "0.2"
+  annotations:
+    tekton.dev/pipelines.minVersion: "0.17.0"
+    tekton.dev/categories: CLI
+    tekton.dev/tags: cli
+    tekton.dev/displayName: "aws cli"
+    tekton.dev/platforms: "linux/amd64"
+spec:
+  description: >-
+    This task performs operations on Amazon Web Services resources using aws.
+
+  workspaces:
+    - name: source
+      optional: true
+    - name: secrets
+      optional: true
+      mountPath: /tekton/home/.aws
+  params:
+    - name: SCRIPT
+      description: The AWS script to run
+      type: string
+      default: "aws $@"
+    - name: ARGS
+      description: AWS cli arguments to be passed
+      type: array
+      default: ["help"] 
+    - name: workingDir
+      description: Working directory parameter
+      default: ""
+  steps:
+    - name: read-directory
+      image: ubuntu
+      script: |
+        echo "echo $(params.workingDir)"
+        echo $(params.workingDir)
+        echo "==================" 
+        echo "pwd"
+        pwd
+        echo "====================="
+        echo "Checking aws config creation, ls -al /tekton/home/.aws"
+        ls -al /tekton/home/.aws
+        echo "========="
+    - name: awscli
+      image: docker.io/amazon/aws-cli:2.0.52@sha256:1506cec98a7101c935176d440a14302ea528b8f92fcaf4a6f1ea2d7ecef7edc4 #tag: 2.0.52
+      script: "$(params.SCRIPT)"
+      args:
+        - "$(params.ARGS)"
+    - name: check-kube-config
+      image: ubuntu
+      script: |
+        echo "====================="
+        echo "Check for kubectl config file (.kube) under $HOME, ls -al /tekton/home/"
+        ls -al /tekton/home/
+        echo "====================="

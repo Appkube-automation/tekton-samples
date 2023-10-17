@@ -53,6 +53,7 @@ spec:
     - name: upgrade-from-repo
       image: $(params.helm_image)
       script: |
+        echo "From Task"
         export AWS_CONFIG_FILE=/tekton/home/.aws/config
         export AWS_SHARED_CREDENTIALS_FILE=/tekton/home/.aws/credentials
         echo "Configure kubectl for eks cluster"
@@ -74,6 +75,8 @@ spec:
         #helm repo add $REPO "$(params.helm_repo)"
         #echo adding updating repo...
         #helm repo update
+        echo clean previous installation...
+        helm uninstall -n appkube-cmdb-service appkube-cmdb-service
         echo installing helm chart...
         #helm upgrade --wait --install --namespace "$(params.release_namespace)" $(params.release_name) $(params.chart_name) --debug --set "$(params.overwrite_values)"
         helm install -n appkube-cmdb-service appkube-cmdb-service /workspace/source/java-service-deploy/appkube-cmdb-service

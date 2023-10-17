@@ -163,6 +163,7 @@ spec:
     value: appkube-cmdb-service
   - name: helm-script-param
     value: |
+      echo "From pipeline run"
       export AWS_CONFIG_FILE=/tekton/home/.aws/config
       export AWS_SHARED_CREDENTIALS_FILE=/tekton/home/.aws/credentials
       echo "Configure kubectl for eks cluster"
@@ -179,6 +180,8 @@ spec:
       kubectl version
       echo "Test kubectl and eks connection, kubectl get pods"
       kubectl get pods
+      echo uninstalling helm chart...
+      echo helm uninstall -n "$(params.release_namespace)" $(params.release_name)
       echo installing helm chart...
       echo helm install -n "$(params.release_namespace)" $(params.release_name) /workspace/source/java-service-deploy/$(params.release_name)
       helm install -n "$(params.release_namespace)" $(params.release_name) /workspace/source/java-service-deploy/$(params.release_name)

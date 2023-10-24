@@ -4,6 +4,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
   name: appkube-cmdb-service-smoke
+  namespace: tekton-pipelines
 spec:
   description: |
     sparse-checkout-list-dir takes a git repository and a list of
@@ -20,10 +21,13 @@ spec:
   params:
   - name: repo-url
     type: string
-    description: The git repository URL to clone from.
+    description: CMDB source repo - https://github.com/AppkubeCloud/appkube-cmdb-service.git
   - name: helm-repo-url
     type: string
-    description: The git repository URL to clone from.
+    description: HELM repo for CMDB service - https://github.com/synectiks-sddc/tekton-samples.git
+  - name: bdd-repo-url
+    type: string
+    description: bdd test repo - https://github.com/AppkubeCloud/appkube-cmdb-bdd-tests
   - name: dockerImageUrl
     type: string
     description: Docker Image URL to push the image
@@ -47,6 +51,9 @@ spec:
   - name: shared-data1
     description: |
       This workspace will receive the cloned helm git repo
+  - name: bdd-test-repo
+    description: |
+      Repo for dbb tests - https://github.com/AppkubeCloud/appkube-cmdb-bdd-tests 
   - name: dockerconfig-secret
     description: |
       This workspace will have docker config.json
@@ -116,12 +123,32 @@ spec:
       workspace: shared-data1
     - name: secrets
       workspace: aws-secrets
+  - name: fetch-bdd-test-repo
+    taskRef:
+      name: git-clone
+    workspaces:
+    - name: output
+      workspace: bdd-test-repo
+    params:
+    - name: url
+      value: $(params.bdd-repo-url)
+  - name: bdd-testing
+    runAfter: ["service-deploy-with-helm"]
+    taskRef:
+      name: cmdb-bdd-testing
+    workspaces:
+    - name: source
+      workspace: bdd-test-repo
+    params:
+    - name: workingDir
+      value: $(workspaces.source.path)/appkube-serenity-bdd
 
 ---
 apiVersion: tekton.dev/v1beta1
 kind: PipelineRun
 metadata:
   name: appkube-cmdb-service-smoke-run
+  namespace: tekton-pipelines
 spec:
   pipelineRef:
     name: appkube-cmdb-service-smoke
@@ -142,6 +169,14 @@ spec:
         resources:
           requests:
             storage: 1Gi
+  - name: bdd-test-repo
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
   - name: dockerconfig-secret
     secret:
       secretName: kaniko-secret
@@ -153,6 +188,8 @@ spec:
     value: https://github.com/AppkubeCloud/appkube-cmdb-service.git
   - name: helm-repo-url
     value: https://github.com/synectiks-sddc/tekton-samples.git
+  - name: bdd-repo-url
+    value: https://github.com/AppkubeCloud/appkube-cmdb-bdd-tests
   - name: dockerImageUrl
     value: synectiks/docker-builders:kaniko
   - name: helm-release-version-param

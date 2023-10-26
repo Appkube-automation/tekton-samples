@@ -1,0 +1,58 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: test-cmdb-service
+  namespace: tekton-pipelines
+spec:
+  description: |
+    pipeline to extract test repo and run tests on cmdb service
+  params:
+    - name: repo-url
+      type: string
+      description: Git repo for cmdb tests
+  workspaces:
+    - name: shared-data
+      description: |
+        git repo checkout location
+  tasks:
+    - name: fetch-repo
+      taskRef:
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: shared-data
+      params:
+        - name: url
+          value: $(params.repo-url)
+    - name: build-maven
+      runAfter: ["fetch-repo"]
+      taskRef:
+        name: cmdb-bdd-testing
+      workspaces:
+        - name: source
+          workspace: shared-data
+      params:
+        - name: workingDir
+          value: $(workspaces.source.path)
+---
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: test-cmdb-service-run
+  namespace: tekton-pipelines
+spec:
+  pipelineRef:
+    name: test-cmdb-service
+  workspaces:
+  - name: shared-data
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  params:
+  - name: repo-url
+    value: https://github.com/AppkubeCloud/appkube-cmdb-bdd-tests

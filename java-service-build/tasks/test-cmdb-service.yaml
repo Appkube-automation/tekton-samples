@@ -1,0 +1,25 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: cmdb-bdd-testing
+  namespace: tekton-pipelines
+spec:
+  workspaces:
+    - name: source
+      description: The git repo will be cloned onto the volume backing this Workspace.
+  params:
+    - name: workingDir
+      description: Working directory parameter
+      default: ""
+  steps:
+    - name: read-directory
+      image: ubuntu
+      script: echo $(params.workingDir) && ls -al $(params.workingDir)
+    - name: maven-builid
+      image: gcr.io/cloud-builders/mvn:3.5.0-jdk-8
+      workingDir: $(params.workingDir)
+      command: ["mvn"]
+      args:
+        - "clean"
+        - "verify"
+        - "serenity:aggregate"

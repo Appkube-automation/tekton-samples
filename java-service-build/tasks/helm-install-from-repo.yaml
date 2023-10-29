@@ -3,6 +3,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: helm-appkube-cmdb-install
+  namespace: tekton-pipelines
   labels:
     app.kubernetes.io/version: "0.2"
   annotations:
@@ -50,7 +51,8 @@ spec:
       description: "Specify a specific helm image"
       default: "alpine/k8s:1.25.14"
   steps:
-    - name: upgrade-from-repo
+    - name: cleanup-cmdb-deployment
+      onError: continue
       image: $(params.helm_image)
       script: |
         echo "From Task"
@@ -58,25 +60,25 @@ spec:
         export AWS_SHARED_CREDENTIALS_FILE=/tekton/home/.aws/credentials
         echo "Configure kubectl for eks cluster"
         aws eks update-kubeconfig --region us-east-1 --name myclustTT
-        
+
         echo "List repo, ls -al /workspace/source"
         ls -al /workspace/source
 
         echo "Check kubectl presence"
         kubectl version
-        echo "Test kubectl and eks connection, kubectl get pods"
-        kubectl get pods
-        #echo current installed helm releases
-        #helm list --namespace "$(params.release_namespace)"
-        #helm list
-        #echo parsing helms repo name...
-        #REPO=`echo "$(params.chart_name)" | cut -d "/" -f 1`
-        #echo adding helm repo...
-        #helm repo add $REPO "$(params.helm_repo)"
-        #echo adding updating repo...
-        #helm repo update
         echo clean previous installation...
-        helm uninstall -n appkube-cmdb-service appkube-cmdb-service
+        helm uninstall -n "$(params.release_namespace)" "$(params.release_namespace)"
+    - name: deploy-cmdb-service
+      image: $(params.helm_image)
+      script: |
+        echo "From Task"
+        export AWS_CONFIG_FILE=/tekton/home/.aws/config
+        export AWS_SHARED_CREDENTIALS_FILE=/tekton/home/.aws/credentials
+        echo "Configure kubectl for eks cluster"
+        aws eks update-kubeconfig --region us-east-1 --name myclustTT
+        echo "List repo, ls -al /workspace/source"
+        ls -al /workspace/source
+        echo "Check kubectl presence"
+        kubectl version
         echo installing helm chart...
-        #helm upgrade --wait --install --namespace "$(params.release_namespace)" $(params.release_name) $(params.chart_name) --debug --set "$(params.overwrite_values)"
-        helm install -n appkube-cmdb-service appkube-cmdb-service /workspace/source/java-service-deploy/appkube-cmdb-service
+        helm install -n "$(params.release_namespace)" "$(params.release_namespace)" /workspace/source/java-service-deploy/"$(params.release_namespace)"

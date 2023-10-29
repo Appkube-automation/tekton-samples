@@ -1,0 +1,48 @@
+# This Task will do cleanup on successful pipeline run
+# Cleanup is skipped on failure to facilite troubleshooting 
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: cleanup-on-success
+  namespace: tekton-pipelines
+  labels:
+    app.kubernetes.io/version: "0.2"
+  annotations:
+    tekton.dev/categories: Deployment
+    tekton.dev/pipelines.minVersion: "0.12.1"
+    tekton.dev/tags: helm
+    tekton.dev/platforms: "linux/amd64,linux/s390x,linux/ppc64le,linux/arm64"
+spec:
+  description: >-
+    These tasks will cleanup on successful pipeline runs
+  workspaces:
+    - name: source
+      optional: true
+    - name: secrets
+      optional: true
+      mountPath: /tekton/home/.aws
+  params:
+    - name: workingDir
+      description: Working directory parameter
+      default: ""
+    - name: namespace
+      description: The helm release namespace
+      default: "tekton-pipelines"
+    - name: helm_image
+      description: "Specify a specific helm image"
+      default: "alpine/k8s:1.25.14"
+  steps:
+    - name: cleanup-successful-pipelineruns
+      onError: continue
+      image: $(params.helm_image)
+      script: |
+        export AWS_CONFIG_FILE=/tekton/home/.aws/config
+        export AWS_SHARED_CREDENTIALS_FILE=/tekton/home/.aws/credentials
+        echo "Configure kubectl for eks cluster"
+        aws eks update-kubeconfig --region us-east-1 --name myclustTT
+        
+        echo list successful pipeline runs
+        kubectl -n "$(params.namespace)" get pipelinerun -o jsonpath='{range .items[?(@.status.conditions[*].status=="True")]}{.metadata.name}{"\n"}{end}'
+
+        echo Delete resouces related to successful pipeline runs
+        kubectl -n "$(params.namespace)" delete pipelinerun $(kubectl -n target-namespace get pipelinerun -o jsonpath='{range .items[?(@.status.conditions[*].status=="True")]}{.metadata.name}{"\n"}{end}')

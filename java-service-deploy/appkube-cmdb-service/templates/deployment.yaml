@@ -45,6 +45,39 @@ spec:
           {{- with .Values.volumeMounts }}
           volumeMounts:
             {{- toYaml . | nindent 12 }}
+          env:
+            - name: SPRING_PROFILE
+              value: dev
+            - name: SPRING_APPLICATION_JSON
+            valueFrom:
+              configMapKeyRef:
+                name: spring-config
+                key: dev-config.json
+            - name: db.user
+              valueFrom:
+              secretKeyRef:
+                name: datasource-credentials
+                key: dbusername
+            - name: db.password
+            valueFrom:
+              secretKeyRef:
+                name: datasource-credentials
+                key: dbpassword
+            - name: db.server.host
+            valueFrom:
+              secretKeyRef:
+                name: datasource-credentials
+                key: dbhost
+            - name: db.server.port
+            valueFrom:
+              secretKeyRef:
+              name: datasource-credentials
+              key: dbport
+            - name: db.schema
+            valueFrom:
+              secretKeyRef:
+                name: datasource-credentials
+                key: dbschema
           {{- end }}
       {{- with .Values.volumes }}
       volumes:
@@ -59,6 +92,6 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       {{- with .Values.tolerations }}
-      tolerations:
+    tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}

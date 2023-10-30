@@ -31,9 +31,6 @@ spec:
   - name: dockerImageUrl
     type: string
     description: Docker Image URL to push the image
-  - name: helm-script-param
-    type: string
-    description: Script to configure kubectl and run helm
   - name: helm-release-version-param
     type: string
     description: Release version in helm chart
@@ -110,8 +107,6 @@ spec:
     taskRef:
       name: helm-appkube-cmdb-install
     params:
-    - name: script 
-      value: $(params.helm-script-param)
     - name: release_version
       value: $(params.helm-release-version-param)
     - name: release_name
@@ -142,7 +137,14 @@ spec:
     params:
     - name: workingDir
       value: $(workspaces.source.path)/appkube-serenity-bdd
-
+  finally:
+    - name: cleanup-on-success
+      when:
+      - input: $(tasks.status)
+        operator: in
+        values: ["Succeeded"]
+      taskRef:
+        name: cleanup-on-success
 ---
 apiVersion: tekton.dev/v1beta1
 kind: PipelineRun
@@ -198,27 +200,3 @@ spec:
     value: appkube-cmdb-service
   - name: helm-release-namespace-param
     value: appkube-cmdb-service
-  - name: helm-script-param
-    value: |
-      echo "From pipeline run"
-      export AWS_CONFIG_FILE=/tekton/home/.aws/config
-      export AWS_SHARED_CREDENTIALS_FILE=/tekton/home/.aws/credentials
-      echo "Configure kubectl for eks cluster"
-      aws eks update-kubeconfig --region us-east-1 --name myclustTT
-
-      echo "Export KUBECONFIG file"
-      [[ -f /root/.kube/config ]]; export KUBECONFIG=/root/.kube/config && \
-      echo "export success"
-
-      echo "List repo, ls -al /workspace/source"
-      ls -al /workspace/source
-
-      echo "Check kubectl presence"
-      kubectl version
-      echo "Test kubectl and eks connection, kubectl get pods"
-      kubectl get pods
-      echo uninstalling helm chart...
-      echo helm uninstall -n "$(params.release_namespace)" $(params.release_name)
-      echo installing helm chart...
-      echo helm install -n "$(params.release_namespace)" $(params.release_name) /workspace/source/java-service-deploy/$(params.release_name)
-      helm install -n "$(params.release_namespace)" $(params.release_name) /workspace/source/java-service-deploy/$(params.release_name)

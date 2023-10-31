@@ -51,28 +51,28 @@ spec:
             - name: db.user
               valueFrom:
               	secretKeyRef:
-                	name: datasource-credentials
-                	key: dbusername
+                  name: datasource-credentials
+                  key: dbusername
             - name: db.password
-        			valueFrom:
+              valueFrom:
               	secretKeyRef:
-                	name: datasource-credentials
-                	key: dbpassword
+                  name: datasource-credentials
+                  key: dbpassword
             - name: db.server.host
-            	valueFrom:
+              valueFrom:
               	secretKeyRef:
-                	name: datasource-credentials
-                	key: dbhost
+                  name: datasource-credentials
+                  key: dbhost
             - name: db.server.port
-            	valueFrom:
+              valueFrom:
               	secretKeyRef:
-              		name: datasource-credentials
-              		key: dbport
+                  name: datasource-credentials
+                  key: dbport
             - name: db.schema
-            	valueFrom:
+              valueFrom:
               	secretKeyRef:
-              		name: datasource-credentials
-                	key: dbschema
+                  name: datasource-credentials
+                  key: dbschema
           {{- end }}
       {{- with .Values.volumes }}
       volumes:

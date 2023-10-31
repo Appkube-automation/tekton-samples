@@ -48,6 +48,11 @@ spec:
           env:
             - name: SPRING_PROFILE
               value: dev
+            - name: SPRING_APPLICATION_JSON
+              valueFrom:
+                configMapKeyRef:
+                  name: spring-config
+                  key: dev-config.json
             - name: db.user
               valueFrom:
               	secretKeyRef:

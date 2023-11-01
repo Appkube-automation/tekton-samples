@@ -53,27 +53,27 @@ spec:
                 configMapKeyRef:
                   name: spring-config
                   key: dev-config.json
-            - name: db.user
+            - name: dbusername
               valueFrom:
               	secretKeyRef:
                   name: datasource-credentials
                   key: dbusername
-            - name: db.password
+            - name: dbpassword
               valueFrom:
               	secretKeyRef:
                   name: datasource-credentials
                   key: dbpassword
-            - name: db.server.host
+            - name: dbhost
               valueFrom:
               	secretKeyRef:
                   name: datasource-credentials
                   key: dbhost
-            - name: db.server.port
+            - name: dbport
               valueFrom:
               	secretKeyRef:
                   name: datasource-credentials
                   key: dbport
-            - name: db.schema
+            - name: dbschema
               valueFrom:
               	secretKeyRef:
                   name: datasource-credentials

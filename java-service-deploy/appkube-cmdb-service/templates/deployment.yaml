@@ -1,84 +1,51 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "appkube-cmdb-service.fullname" . }}
-  labels:
-    {{- include "appkube-cmdb-service.labels" . | nindent 4 }}
+name: {{ include "appkube-cmdb-service.fullname" . }}
+labels:
+{{- include "appkube-cmdb-service.labels" . | nindent 4 }}
 spec:
-  {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount }}
+{{- if not .Values.autoscaling.enabled }}
+replicas: {{ .Values.replicaCount }}
+{{- end }}
+selector:
+matchLabels:
+  {{- include "appkube-cmdb-service.selectorLabels" . | nindent 6 }}
+template:
+metadata:
+  {{- with .Values.podAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 8 }}
   {{- end }}
-  selector:
-    matchLabels:
-      {{- include "appkube-cmdb-service.selectorLabels" . | nindent 6 }}
-  template:
-    metadata:
-      {{- with .Values.podAnnotations }}
-      annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      labels:
-        {{- include "appkube-cmdb-service.labels" . | nindent 8 }}
-	{{- with .Values.podLabels }}
-        {{- toYaml . | nindent 8 }}
-        {{- end }}
-    spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      serviceAccountName: {{ include "appkube-cmdb-service.serviceAccountName" . }}
+  labels:
+    {{- include "appkube-cmdb-service.labels" . | nindent 8 }}
+    {{- with .Values.podLabels }}
+    {{- toYaml . | nindent 8 }}
+    {{- end }}
+spec:
+  {{- with .Values.imagePullSecrets }}
+  imagePullSecrets:
+    {{- toYaml . | nindent 8 }}
+  {{- end }}
+  serviceAccountName: {{ include "appkube-cmdb-service.serviceAccountName" . }}
+  securityContext:
+    {{- toYaml .Values.podSecurityContext | nindent 8 }}
+  containers:
+    - name: {{ .Chart.Name }}
       securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      containers:
-        - name: {{ .Chart.Name }}
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          ports:
-            - name: http
-              containerPort: {{ .Values.service.port }}
-              protocol: TCP
-          resources:
-            {{- toYaml .Values.resources | nindent 12 }}
-          {{- with .Values.volumeMounts }}
-          volumeMounts:
-            {{- toYaml . | nindent 12 }}
-          env:
-            - name: SPRING_PROFILE
-              value: dev
-            - name: SPRING_APPLICATION_JSON
-              valueFrom:
-                configMapKeyRef:
-                  name: spring-config
-                  key: dev-config.json
-            - name: dbusername
-              valueFrom:
-              	secretKeyRef:
-                  name: datasource-credentials
-                  key: dbusername
-            - name: dbpassword
-              valueFrom:
-              	secretKeyRef:
-                  name: datasource-credentials
-                  key: dbpassword
-            - name: dbhost
-              valueFrom:
-              	secretKeyRef:
-                  name: datasource-credentials
-                  key: dbhost
-            - name: dbport
-              valueFrom:
-              	secretKeyRef:
-                  name: datasource-credentials
-                  key: dbport
-            - name: dbschema
-              valueFrom:
-              	secretKeyRef:
-                  name: datasource-credentials
-                  key: dbschema
-          {{- end }}
+        {{- toYaml .Values.securityContext | nindent 12 }}
+      image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+      imagePullPolicy: {{ .Values.image.pullPolicy }}
+      ports:
+        - name: http
+          containerPort: {{ .Values.service.port }}
+          protocol: TCP
+      resources:
+        {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.volumeMounts }}
+      volumeMounts:
+        {{- toYaml . | nindent 12 }}
+      {{- end }}
       {{- with .Values.volumes }}
       volumes:
         {{- toYaml . | nindent 8 }}
@@ -92,6 +59,66 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       {{- with .Values.tolerations }}
-    tolerations:
+    		tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      env:
+        - name: DEMO_TEST
+          value: "Hello env"
+        - name: SPRING_PROFILE
+          value: dev
+        - name: SPRING_APPLICATION_JSON
+          valueFrom:
+            configMapKeyRef:
+              name: spring-config
+              key: dev-config.json
+        - name: dbusername
+          valueFrom:
+            secretKeyRef:
+              name: datasource-credentials
+              key: dbusername
+        - name: dbpassword
+          valueFrom:
+            secretKeyRef:
+              name: datasource-credentials
+              key: dbpassword
+        - name: dbhost
+          valueFrom:
+            secretKeyRef:
+              name: datasource-credentials
+              key: dbhost
+        - name: dbport
+          valueFrom:
+            secretKeyRef:
+              name: datasource-credentials
+              key: dbport
+        - name: dbschema
+          valueFrom:
+            secretKeyRef:
+              name: datasource-credentials
+              key: dbschema
+        - name: db.user
+          valueFrom:
+            secretKeyRef:
+              name: datasource-credentials
+              key: dbusername
+        - name: db.password
+          valueFrom:
+            secretKeyRef:
+              name: datasource-credentials
+              key: dbpassword
+        - name: db.server.host
+          valueFrom:
+            secretKeyRef:
+              name: datasource-credentials
+              key: dbhost
+        - name: db.server.port
+          valueFrom:
+            secretKeyRef:
+              name: datasource-credentials
+              key: dbport
+        - name: db.schema
+          valueFrom:
+            secretKeyRef:
+              name: datasource-credentials
+              key: dbschema

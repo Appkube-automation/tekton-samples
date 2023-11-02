@@ -98,3 +98,22 @@ tolerations: []
 affinity: {}
 
 dbconfiguration: {}
+
+profile:
+  # Application profile type, eg: dev, local,prod,stage.
+  envType: "dev"
+secret:
+  name: datasource-credentials
+env:
+  # Application profile type, eg: dev, local,prod,stage.
+  normal:
+   SPRING_PROFILE: dev
+
+  secret:
+    db.user: dbusername
+    db.password: dbpassword
+    db.server.host: dbhost
+    db.server.port: dbport
+    db.schema: dbschema 
+
+

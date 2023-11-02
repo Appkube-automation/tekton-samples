@@ -50,33 +50,7 @@ spec:
             - configMapRef:
                 name: dev-config
           env:
-            - name: SPRINtG_PROFILE
-              value: "devtest"
-            - name: db.user
-              valueFrom:
-                secretKeyRef:
-                  name: datasource-credentials
-                  key: dbusername
-            - name: db.password
-              valueFrom:
-                secretKeyRef:
-                  name: datasource-credentials
-                  key: dbpassword
-            - name: db.server.host
-              valueFrom:
-                secretKeyRef:
-                  name: datasource-credentials
-                  key: dbhost
-            - name: db.server.port
-              valueFrom:
-                secretKeyRef:
-                  name: datasource-credentials
-                  key: dbport
-            - name: db.schema
-              valueFrom:
-                secretKeyRef:
-                  name: datasource-credentials
-                  key: dbschema
+            {{- include "helpers.list-env-variables" . | indent 12 }}
       {{- with .Values.volumes }}
       volumes:
         {{- toYaml . | nindent 8 }}

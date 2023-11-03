@@ -22,6 +22,9 @@ spec:
   - name: repo-url
     type: string
     description: CMDB source repo - https://github.com/AppkubeCloud/appkube-cmdb-service.git
+  - name: repo-revision
+    type: string
+    description: service revision to checkout. (branch, tag, sha, ref, etc...)
   - name: helm-repo-url
     type: string
     description: HELM repo for CMDB service - https://github.com/synectiks-sddc/tekton-samples.git
@@ -64,6 +67,8 @@ spec:
     params:
     - name: url
       value: $(params.repo-url)
+    - name: revision
+      value: $(params.repo-revision)
   - name: build-maven
     runAfter: ["fetch-repo"]
     taskRef:
@@ -185,6 +190,8 @@ spec:
   params:
   - name: repo-url
     value: https://github.com/AppkubeCloud/appkube-cmdb-service.git
+  - name: repo-revision
+    value: ''
   - name: helm-repo-url
     value: https://github.com/synectiks-sddc/tekton-samples.git
   - name: bdd-repo-url

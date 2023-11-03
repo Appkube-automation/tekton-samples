@@ -28,9 +28,6 @@ spec:
   - name: bdd-repo-url
     type: string
     description: bdd test repo - https://github.com/AppkubeCloud/appkube-cmdb-bdd-tests
-  - name: dockerImageUrl
-    type: string
-    description: Docker Image URL to push the image
   - name: helm-release-version-param
     type: string
     description: Release version in helm chart
@@ -88,7 +85,7 @@ spec:
       workspace: dockerconfig-secret
     params:
     - name: IMAGE
-      value: $(params.dockerImageUrl)
+      value: synectiks/appkube-cmdb-service:$(tasks.fetch-repo.results.commit)
     - name: DOCKERFILE
       value: $(workspaces.source.path)/Dockerfile
     - name: CONTEXT
@@ -192,8 +189,6 @@ spec:
     value: https://github.com/synectiks-sddc/tekton-samples.git
   - name: bdd-repo-url
     value: https://github.com/AppkubeCloud/appkube-cmdb-bdd-tests
-  - name: dockerImageUrl
-    value: synectiks/docker-builders:kaniko
   - name: helm-release-version-param
     value: 0.1.0
   - name: helm-release-name-param

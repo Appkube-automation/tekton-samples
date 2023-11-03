@@ -1,0 +1,35 @@
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: appkubecmdb-gateway
+  namespace: appkube-cmdb-service
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+      - "appkubecmdb.synectiks.net"
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: appkubecmdb-vs
+  namespace: appkube-cmdb-service
+spec:
+  hosts:
+  - "appkubecmdb.synectiks.net"
+  gateways:
+  - appkubecmdb-gateway
+  http:
+    - match:
+      - uri:
+          prefix: "/"
+      route:
+      - destination:
+          host: appkube-cmdb-service
+          port:
+            number: 6057

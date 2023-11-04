@@ -5,10 +5,10 @@
 replicaCount: 1
 
 image:
-  repository: synectiks/docker-builders
+  repository: synectiks/appkube-cmdb-service
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "kaniko"
+  tag: latest
 
 imagePullSecrets: []
 nameOverride: ""

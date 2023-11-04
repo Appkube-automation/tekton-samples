@@ -81,4 +81,4 @@ spec:
         echo "Check kubectl presence"
         kubectl version
         echo installing helm chart...
-        helm install -n "$(params.release_namespace)" "$(params.release_namespace)" /workspace/source/java-service-deploy/"$(params.release_namespace)"
+        helm install -n "$(params.release_namespace)" "$(params.release_namespace)" /workspace/source/java-service-deploy/"$(params.release_namespace)" --set "$(params.overwrite_values)"

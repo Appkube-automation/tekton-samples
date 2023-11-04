@@ -115,6 +115,8 @@ spec:
       value: $(params.helm-release-name-param)
     - name: release_namespace
       value: $(params.helm-release-namespace-param)
+    - name: overwrite_values
+      value: image.tag=$(tasks.fetch-repo.results.commit)
     workspaces:
     - name: source
       workspace: shared-data1

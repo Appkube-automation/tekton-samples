@@ -90,7 +90,7 @@ spec:
       workspace: dockerconfig-secret
     params:
     - name: IMAGE
-      value: synectiks/appkube-cmdb-service:$(tasks.fetch-repo.results.commit)
+      value: synectiks/appkube-security-rbac-service:$(tasks.fetch-repo.results.commit)
     - name: DOCKERFILE
       value: $(workspaces.source.path)/Dockerfile
     - name: CONTEXT
@@ -107,7 +107,7 @@ spec:
   - name: service-deploy-with-helm
     runAfter: ["build-kaniko"]
     taskRef:
-      name: helm-appkube-cmdb-install
+      name: helm-security-rbac-install
     params:
     - name: release_version
       value: $(params.helm-release-version-param)
@@ -116,7 +116,7 @@ spec:
     - name: release_namespace
       value: $(params.helm-release-namespace-param)
     - name: overwrite_values
-      value: "image.tag=$(tasks.fetch-repo.results.commit),service.port=$(service-port)"
+      value: "image.tag=$(tasks.fetch-repo.results.commit),service.port=$(params.service-port)"
     workspaces:
     - name: source
       workspace: shared-data1
@@ -201,12 +201,10 @@ spec:
   - name: helm-repo-url
     value: https://github.com/synectiks-sddc/tekton-samples.git
   - name: bdd-repo-url
-    value: https://github.com/AppkubeCloud/appkube-cmdb-security-tests
+    value: https://github.com/AppkubeCloud/appkube-cmdb-security-tests.git
   - name: helm-release-version-param
     value: 0.1.0
   - name: helm-release-name-param
-    value: "$(service-name)"
+    value: "$(params.service-name)"
   - name: helm-release-namespace-param
-    value: "$(service-name)"
-  - name: helm-service-port-param
-    value: "$(service-port)"
+    value: "$(params.service-name)"

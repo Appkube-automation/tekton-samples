@@ -1,0 +1,38 @@
+---
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: {{ .Values.gateway.name }}
+  namespace: {{ include "appkube-security-rbac-service.fullname" . }}
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - {{ .Values.gateway.hostname }}
+
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: {{ .Values.gateway.virtualservicename }}
+  namespace: {{ include "appkube-security-rbac-service.fullname" . }}
+spec:
+  hosts:
+    - {{ .Values.gateway.hostname }}
+  gateways:
+    - {{ .Values.gateway.name }}
+  http:
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: {{ include "appkube-security-rbac-service.fullname" . }}
+            port:
+              number: 8094
+

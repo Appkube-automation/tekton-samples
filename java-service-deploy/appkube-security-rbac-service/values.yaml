@@ -113,3 +113,8 @@ env:
   # Application profile type, eg: dev, local,prod,stage - TBD
   normal:
    SPRING_PROFILE: dev
+gateway:
+  name: appkube-security-rbac-gateway
+  hostname: appkubesecurity.synectiks.net
+  port: 8094
+  virtualservicename: appkube-security-rbac-vs

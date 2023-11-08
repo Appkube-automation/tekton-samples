@@ -1,0 +1,212 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: appkube-security-service-smoke
+  namespace: tekton-pipelines
+spec:
+  description: |
+    Pipeline to build, deploy and smoketest appkube services
+  params:
+  - name: service-name
+    type: string
+    description: Name of appkube service for pipeline execution 
+      Supported values appkube-cmdb-service, appkube-security-rbac-service
+  - name: service-port
+    type: string
+    description: port for appkube-service 
+  - name: repo-url
+    type: string
+    description: CMDB source repo - https://github.com/AppkubeCloud/appkube-cmdb-service.git
+      Security RBAC repo -  https://github.com/AppkubeCloud/common-security-rbac-service.git
+  - name: repo-revision
+    type: string
+    description: service revision to checkout. (branch, tag, sha, ref, etc...)
+  - name: helm-repo-url
+    type: string
+    description: HELM repo for CMDB service - https://github.com/synectiks-sddc/tekton-samples.git
+  - name: bdd-repo-url
+    type: string
+    description: bdd test repo - https://github.com/AppkubeCloud/appkube-cmdb-bdd-tests.git
+  - name: helm-release-version-param
+    type: string
+    description: Release version in helm chart
+  - name: helm-release-name-param
+    type: string
+    description: Helm release name
+  - name: helm-release-namespace-param
+    type: string
+    description: namespace for service installation
+  - name: helm-service-port-param
+    type: string
+    description: port for service installation
+  workspaces:
+  - name: shared-data
+    description: |
+      This workspace will receive the cloned git repo and be passed
+      to the next Task to list all cloned files and directories.
+  - name: shared-data1
+    description: |
+      This workspace will receive the cloned helm git repo
+  - name: bdd-test-repo
+    description: |
+      Repo for dbb tests - https://github.com/AppkubeCloud/appkube-cmdb-bdd-tests
+  - name: dockerconfig-secret
+    description: |
+      This workspace will have docker config.json
+  - name: aws-secrets
+    description: |
+      This workspace will hold aws credentials
+  tasks:
+  - name: fetch-repo
+    taskRef:
+      name: git-clone
+    workspaces:
+    - name: output
+      workspace: shared-data
+    params:
+    - name: url
+      value: $(params.repo-url)
+    - name: revision
+      value: $(params.repo-revision)
+  - name: build-maven
+    runAfter: ["fetch-repo"]
+    taskRef:
+      name: build-maven
+    workspaces:
+    - name: source
+      workspace: shared-data
+    params:
+    - name: workingDir
+      value: $(workspaces.source.path)
+  - name: build-kaniko
+    runAfter: ["build-maven"]
+    taskRef:
+      name: build-kaniko
+    workspaces:
+    - name: source
+      workspace: shared-data
+    - name: dockerconfig
+      workspace: dockerconfig-secret
+    params:
+    - name: IMAGE
+      value: synectiks/appkube-cmdb-service:$(tasks.fetch-repo.results.commit)
+    - name: DOCKERFILE
+      value: $(workspaces.source.path)/Dockerfile
+    - name: CONTEXT
+      value: ./
+  - name: fetch-helm-repo
+    taskRef:
+      name: git-clone
+    workspaces:
+    - name: output
+      workspace: shared-data1
+    params:
+    - name: url
+      value: $(params.helm-repo-url)
+  - name: service-deploy-with-helm
+    runAfter: ["build-kaniko"]
+    taskRef:
+      name: helm-appkube-cmdb-install
+    params:
+    - name: release_version
+      value: $(params.helm-release-version-param)
+    - name: release_name
+      value: $(params.helm-release-name-param)
+    - name: release_namespace
+      value: $(params.helm-release-namespace-param)
+    - name: overwrite_values
+      value: "image.tag=$(tasks.fetch-repo.results.commit),service.port=$(service-port)"
+    workspaces:
+    - name: source
+      workspace: shared-data1
+    - name: secrets
+      workspace: aws-secrets
+  - name: fetch-bdd-test-repo
+    taskRef:
+      name: git-clone
+    workspaces:
+    - name: output
+      workspace: bdd-test-repo
+    params:
+    - name: url
+      value: $(params.bdd-repo-url)
+  - name: bdd-testing
+    runAfter: ["service-deploy-with-helm"]
+    taskRef:
+      name: cmdb-bdd-testing
+    workspaces:
+    - name: source
+      workspace: bdd-test-repo
+    params:
+    - name: workingDir
+      value: $(workspaces.source.path)/appkube-serenity-bdd
+  finally:
+    - name: cleanup-on-success
+      when:
+      - input: $(tasks.status)
+        operator: in
+        values: ["Succeeded"]
+      taskRef:
+        name: cleanup-on-success
+---
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: appkube-security-service-smoke-run
+  namespace: tekton-pipelines
+spec:
+  pipelineRef:
+    name: appkube-security-service-smoke
+  workspaces:
+  - name: shared-data
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  - name: shared-data1
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  - name: bdd-test-repo
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  - name: dockerconfig-secret
+    secret:
+      secretName: kaniko-secret
+  - name: aws-secrets
+    secret:
+      secretName: smoke-aws-credentials
+  params:
+  - name: service-name
+    value: appkube-security-rbac-service
+  - name: service-port
+    value: 8094
+  - name: repo-url
+    value: https://github.com/AppkubeCloud/common-security-rbac-service.git
+  - name: repo-revision
+    value: ''
+  - name: helm-repo-url
+    value: https://github.com/synectiks-sddc/tekton-samples.git
+  - name: bdd-repo-url
+    value: https://github.com/AppkubeCloud/appkube-cmdb-security-tests
+  - name: helm-release-version-param
+    value: 0.1.0
+  - name: helm-release-name-param
+    value: "$(service-name)"
+  - name: helm-release-namespace-param
+    value: "$(service-name)"
+  - name: helm-service-port-param
+    value: "$(service-port)"

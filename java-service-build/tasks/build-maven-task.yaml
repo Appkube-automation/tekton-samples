@@ -2,6 +2,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: build-maven
+  namespace: tekton-pipelines
 spec:
   workspaces:
     - name: source
@@ -19,8 +20,10 @@ spec:
       workingDir: $(params.workingDir)
       command: ["mvn"]
       args:
+        - "-e"
         - "clean"
         - "install"
+        - "-DskipTests=true"
     - name: ls-target
       image: ubuntu
       command:

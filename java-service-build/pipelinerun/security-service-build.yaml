@@ -37,9 +37,6 @@ spec:
   - name: helm-release-namespace-param
     type: string
     description: namespace for service installation
-  - name: helm-service-port-param
-    type: string
-    description: port for service installation
   workspaces:
   - name: shared-data
     description: |
@@ -140,7 +137,7 @@ spec:
       workspace: bdd-test-repo
     params:
     - name: workingDir
-      value: $(workspaces.source.path)/appkube-serenity-bdd
+      value: $(workspaces.source.path)/appkube-cmdb-security-tests
   finally:
     - name: cleanup-on-success
       when:

@@ -1,0 +1,12 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: writer
+  namespace: tekton-pipelines
+spec:
+  steps:
+    - name: write
+      image: ubuntu
+      script: echo bar > $(workspaces.task-ws.path)/foo
+  workspaces:
+    - name: task-ws

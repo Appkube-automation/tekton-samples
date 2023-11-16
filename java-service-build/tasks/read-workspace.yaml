@@ -1,0 +1,12 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: read-workspace
+  namespace: tekton-pipelines
+spec:
+  workspaces:
+    - name: local-ws
+  steps:
+    - name: list-files
+      image: ubuntu
+      script: ls -a $(workspaces.local-ws.path)

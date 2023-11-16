@@ -1,0 +1,27 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: copy-folder-between-workspace
+  namespace: tekton-pipelines
+spec:
+  params:
+    - name: source-directory
+      type: string
+      default: public
+    - name: dest-directory
+      type: string
+      default: www
+  steps:
+    - name: copy-contents
+      image: ubuntu
+      script: |
+        #!/usr/bin/env bash
+        set -xe
+        cp -r $(workspaces.source-ws.path)/$(params.source-directory)/ $(workspaces.dest-ws.path)/$(params.dest-directory)/
+  workspaces:
+    - name: source-ws
+      description: |
+        The sorce workspace from where we copy the contents 
+    - name: dest-ws
+      description: |
+        The destination workspace       

@@ -1,0 +1,158 @@
+
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: ui-build-service
+  namespace: tekton-pipelines
+spec:
+  description: |
+    The pipeline will do UI deployment in AWS CDN from github UI 
+    This pipeline will do the following steps:
+      - Using the git-clone catalog Task to clone the UI source Code
+      - It will do build the UI code , and create the deployment artifacts that need to be copied to S3
+      - Then it will git clone the deployment source code 
+      - It will copy the build artifacts into the www folder fo deployment folder.
+      - It will then invoke the cloud formation template using aws cli
+      - Then it should test the UI availability
+  params:
+  - name: ui-repo-url
+    type: string
+    description: The UI git repository URL to clone from.
+  - name: deployment-repo-url
+    type: string
+    description: The deployment git repository URL to clone from.
+  workspaces:
+  - name: ui-code
+    description: |
+      This workspace will clone the UI codes and build the code
+  - name: deployment-code
+    description: |
+      This workspace will clone the deployment  codes and invoke the AWS cloudformation script
+  tasks:
+  - name: fetch-repo
+    taskRef:
+      name: git-clone
+    workspaces:
+    - name: output
+      workspace: ui-code
+    params:
+    - name: url
+      value: $(params.ui-repo-url)
+  - name: list-workspace
+    runAfter:
+      - fetch-repo
+    taskRef:
+      name: read-workspace
+    workspaces:
+    - name: local-ws
+      workspace: ui-code
+  - name: install-dependencies
+    runAfter:
+      - fetch-repo
+    taskRef:
+      name: npm
+    workspaces:
+      - name: source
+      workspace: ui-code
+    params:
+    - name: ARGS
+      value:
+        - clean-install
+  - name: build-ui
+    runAfter:
+      - install-dependencies
+    taskRef:
+      name: npm
+    workspaces:
+      - name: source
+        workspace: ui-code
+    params:
+      - name: PATH_CONTEXT
+        value: $(workspaces.source.path)
+      - name: ARGS
+        value:
+          - "run"
+          - "build"
+  - name: list-workspace-after-build
+    runAfter:
+      - build-ui
+    taskRef:
+      name: read-workspace
+    workspaces:
+    - name: local-ws
+      workspace: ui-code
+  - name: list-build-folder-contents
+    runAfter:
+      - build-ui
+    taskRef:
+      name: read-directory
+    params:
+    - name: directory
+      value: build
+    workspaces:
+    - name: local-ws
+      workspace: ui-code
+  - name: fetch-deployment-repo
+    runAfter:
+        - list-build-folder-contents
+    taskRef:
+      name: git-clone
+    workspaces:
+    - name: output
+      workspace: deployment-code
+    params:
+    - name: url
+      value: $(params.deployment-repo-url)
+  - name: list-deployment-workspace
+    runAfter:
+      - fetch-deployment-repo
+    taskRef:
+      name: read-workspace
+    workspaces:
+    - name: local-ws
+      workspace: deployment-code
+
+  - name: copy-build-content-in-www
+    runAfter:
+      - list-deployment-workspace
+    taskRef:
+      name: copy-folder-between-workspace
+    params:
+    - name: directory
+      value: build
+    workspaces:
+    - name: source-ws
+      workspace: deployment-code
+
+---
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: ui-build-service-run
+  namespace: tekton-pipelines
+spec:
+  pipelineRef:
+    name: ui-build-service
+  workspaces:
+  - name: ui-code
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 4Gi
+  - name: deployment-code
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  params:
+  - name: ui-repo-url
+    value: https://github.com/AppkubeCloud/appkube-standalone-ui.git
+  - name: deployment-repo-url
+    value: https://github.com/AppkubeCloud/appkube-standalone-ui-deployment.git

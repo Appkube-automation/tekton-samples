@@ -1,0 +1,15 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: read-directory
+  namespace: tekton-pipelines
+spec:
+  params:
+    - name: directory
+      type: string
+  workspaces:
+    - name: local-ws
+  steps:
+    - name: read-directory
+      image: ubuntu
+      script: ls -a $(workspaces.local-ws.path)/$(params.directory)

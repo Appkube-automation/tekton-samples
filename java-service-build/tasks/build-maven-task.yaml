@@ -24,11 +24,4 @@ spec:
         - "clean"
         - "install"
         - "-DskipTests=true"
-    - name: ls-target
-      image: ubuntu
-      command:
-        - "ls"
-      args:
-        - "-la"
-        - "$(params.workingDir)/target"
   
